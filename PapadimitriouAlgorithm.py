@@ -26,38 +26,32 @@ def construct_expr_dict():
                     expr_dict[(c1n,b1,c2n,b2)] = evaluate_expr(c1n,b1,c2n,b2)
     return expr_dict
 
-def evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,p_change):
+def evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,p_changes):
     #Given an expr_dict (used for speeding up the calculation), a list of clauses, a dictionary of relevant clauses for every bit of vars, and a list of vars (bits), we output a set (of clause-ids) which signifies which clauses were NOT satisfied.
     #p_change determines which position changed. If it is "None" then we do a full evaluation. If not, we only evaluate all the clauses that involve p_change.
-    if p_change == None:
+    if len(p_changes) == 0:
         for cl_idx in range(len(cls)):
             cl = cls[cl_idx]
             if not expr_dict[(cl[0],vars[cl[1]],cl[2],vars[cl[3]])]:
                 unsat_cls.add(cl_idx)
     else:
-        for cl_idx in rel_cls[p_change]:
-            cl = cls[cl_idx]
-            if not expr_dict[(cl[0],vars[cl[1]],cl[2],vars[cl[3]])]:
-                unsat_cls.add(cl_idx)
-            else:
-                unsat_cls.discard(cl_idx)
-    if (len(unsat_cls)==0):
-        print('solution found!')
-        quit()
+        for p_change in p_changes:
+            for cl_idx in rel_cls[p_change]:
+                cl = cls[cl_idx]
+                if not expr_dict[(cl[0],vars[cl[1]],cl[2],vars[cl[3]])]:
+                    unsat_cls.add(cl_idx)
+                else:
+                    unsat_cls.discard(cl_idx)
 
-def modify_bit(unsat_cls,vars):
-    unsat_cl_idx = random.sample(unsat_cls, 1)[0] #pick a random unsatisfied clause
-    unsat_cl = cls[unsat_cl_idx]
-    p_change = random.choice([unsat_cl[1], unsat_cl[3]]) #randomly pick on the two bits
-    vars[p_change] = not vars[p_change] #flip the chosen bit
-    return p_change
-
-def modify_multiple_bits(unsat_cls,vars,nr_bits):
+def modify_bits(unsat_cls,vars,nr_bits):
+    p_changes = []
     unsat_cl_idx = random.sample(unsat_cls, nr_bits) #pick a random unsatisfied clause
     for idx in unsat_cl_idx:
         unsat_cl = cls[idx]
         p_change = random.choice([unsat_cl[1], unsat_cl[3]]) #randomly pick on the two bits
         vars[p_change] = not vars[p_change] #flip the chosen bit
+        p_changes.append(p_change)
+    return p_changes
 
 def run_Papadimitriou(nr_vars,cls,rel_cls):
     #set number of iterations and calculate a dictionary of all expressions
@@ -69,17 +63,26 @@ def run_Papadimitriou(nr_vars,cls,rel_cls):
         print('new random generation ',i,' of ', nr_it)
         vars = [random.choice([True, False]) for _ in range(nr_vars)]
         unsat_cls = set()
-        evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,None)
+        evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,[])
+        changed_bits = 0
         
-        for j in range(2*nr_vars*nr_vars):
-            p_change = modify_bit(unsat_cls,vars)
-            evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,p_change)
-
-            #modify_multiple_bits(unsat_cls,vars,10)
-            #evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,None)
-            print(len(unsat_cls))
+        while changed_bits < 2*nr_vars*nr_vars:
+            #print('--')
+            if (len(unsat_cls)<36): #36 was chosen cause that is where nr_bits = len(unsat_cls)
+                nr_bits = 1
+            else:
+                nr_bits = int(log(len(unsat_cls)))*10
+            #print(nr_bits)
+            changed_bits += nr_bits
+            p_changes = modify_bits(unsat_cls,vars,nr_bits)
+            evaluate_cls(cls,rel_cls,vars,expr_dict,unsat_cls,p_changes)
+            #print('changed_bits,len(unsat_cls),nr_vars',changed_bits,len(unsat_cls),nr_vars)
+            if (len(unsat_cls)==0):
+                print('solution found!')
+                return
 
     print('no solution found!')
+    return
 
 if __name__ == "__main__":
     file_name =  '2SATtest1.txt'
